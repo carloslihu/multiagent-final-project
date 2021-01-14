@@ -9,7 +9,7 @@ from mesa.space import NetworkGrid
 from mesa.datacollection import DataCollector
 
 
-############################################################################
+################################# GENERAL FUNCTIONS ###########################################
 def pairwise(iterable):
     "s -> (s0,s1), (s1,s2), (s2, s3), ..."
     a, b = itertools.tee(iterable)
@@ -36,7 +36,7 @@ def get_best_agents(model):
 ############################################################################
 
 
-
+#################################### MODEL ########################################
 class TSPModel(Model):
     def __init__(self, a=1, b=2, ro=0.02, m=10, tao_init=1, tao_max=2, tao_min=0#, width=10, height=10
                  , tsp_data_file = 'data/wi29.tsp'
@@ -55,6 +55,7 @@ class TSPModel(Model):
         
         # the grid is created
         self.grid = NetworkGrid(problem.get_graph())
+        self.G = self.grid.G
         self.max_nodes = self.grid.G.number_of_nodes()
         
         # Initialize pheromones to each edge (edges are bidirectional and share attributes)
@@ -127,8 +128,8 @@ class TSPModel(Model):
     def step(self):
         # Each step is a complete solution
         
-        # TODO review max_nodes-1 viajes
-        for i in range(self.max_nodes-1):
+        # TODO 1 complete cycle
+        for i in range(self.max_nodes):
             self.schedule.step()
         
         # collect data
@@ -162,10 +163,10 @@ class TSPModel(Model):
         for i in range(n):
             self.step()
 ############################################################################            
-            
-            
-            
 
+
+
+############################### AGENT #############################################
 class TSPAgent(Agent):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
@@ -196,13 +197,17 @@ class TSPAgent(Agent):
             probabilities[f-1] = (tao_ij ** a) * (eta ** b)# f-1 because array starts at 0
         
         # divides by total sum
-        probabilities = probabilities / np.sum(probabilities)
+        if np.sum(probabilities) != 0:
+            probabilities = probabilities / np.sum(probabilities)
         return probabilities
     
     def visit_node(self, probabilities):
         # Chooses unvisited node stochastically
         all_nodes = range(1, self.model.max_nodes + 1)
-        next_node_id = self.model.random.choices(all_nodes, weights=probabilities, k=1)[0]
+        if all(p == 0 for p in probabilities):
+            next_node_id = all_nodes[0]
+        else:
+            next_node_id = self.model.random.choices(all_nodes, weights=probabilities, k=1)[0]
         
         # Updates the agent
         e = (self.visited_nodes[-1], next_node_id)
