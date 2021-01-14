@@ -8,7 +8,6 @@ from model import TSPModel
 
 
 # def network_portrayal(G):
-#     # The model ensures there is always 1 agent per node
 
 #     def node_color():
 #         return "#008000" # green
@@ -27,8 +26,8 @@ from model import TSPModel
 #     portrayal["nodes"] = [
 #         {
 #             "id": node_id,
-#             "size": 3 if agents else 1,
-#             "color": "#CC0000" if not agents else "#007959",
+#             "size": 1,
+#             "color": "#007959",
 #             "label": "Node {}".format(node_id),
 #             "x": G.nodes[node_id]['coord'][0],
 #             "y": G.nodes[node_id]['coord'][1]
