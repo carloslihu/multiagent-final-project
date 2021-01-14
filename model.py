@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import pandas as pd
 import tsplib95
@@ -19,10 +20,25 @@ def pairwise(iterable):
 
 def get_best_length(model):
     """Picks the shortest length from the model (in this iteration)"""
-    agent_lengths = [agent.total_distance for agent in model.schedule.agents]
+    agents = model.schedule.agents
+    agent_lengths = [agent.total_distance for agent in agents]
     L_best = min(agent_lengths)
     return L_best
 
+# def get_global_best_length(model):
+#     L_best_values = model.datacollector.get_model_vars_dataframe()#['L_best']
+#     print(L_best_values, type(L_best_values))
+#     if not L_best_values.empty:
+#         global_best_length = min(L_best_values)
+#     else:
+#         global_best_length = 100000
+#     return global_best_length
+
+def get_best_path(model):
+    L_best = get_best_length(model)
+    agents = model.schedule.agents
+    list_visited_nodes = [a.visited_nodes for a in agents if a.total_distance == L_best]
+    return list_visited_nodes
 
 def get_best_agents(model):
     """Picks the agent with the shortest length from the model (in this iteration)"""
@@ -30,6 +46,10 @@ def get_best_agents(model):
     
     agents = model.schedule.agents
     list_agents = [[a.unique_id, a.visited_nodes, a.total_distance] for a in agents if a.total_distance == L_best]
+    # we update the best solution
+    if L_best < model.global_best_L:
+        model.global_best_L = L_best
+        model.global_best_path = list_agents[0][1] # we choose the first solution
     
     best_agents = pd.DataFrame(list_agents, columns = ['unique_id', 'visited_nodes', 'total_distance'])
     return best_agents
@@ -38,8 +58,8 @@ def get_best_agents(model):
 
 #################################### MODEL ########################################
 class TSPModel(Model):
-    def __init__(self, a=1, b=2, ro=0.02, m=10, tao_init=1, tao_max=2, tao_min=0#, width=10, height=10
-                 , tsp_data_file = 'data/wi29.tsp'
+    def __init__(self, a=1, b=2, ro=0.02, m=1, tao_init=1, tao_max=2, tao_min=0, 
+                 tsp_data_file = 'data/wi29.tsp'
                 ):
         # Model parameters
         self.history_coefficient = a
@@ -49,13 +69,16 @@ class TSPModel(Model):
         self.pheromone_initial = tao_init
         self.pheromone_max = tao_max
         self.pheromone_min = tao_min
+        # global best solutions
+        self.global_best_L = math.inf
+        self.global_best_path = []
         
         # Reads the tsp_data_file
         problem = tsplib95.load(tsp_data_file)
         
         # the grid is created
-        self.grid = NetworkGrid(problem.get_graph())
-        self.G = self.grid.G
+        self.G = problem.get_graph()
+        self.grid = NetworkGrid(self.G)
         self.max_nodes = self.grid.G.number_of_nodes()
         
         # Initialize pheromones to each edge (edges are bidirectional and share attributes)
@@ -66,8 +89,9 @@ class TSPModel(Model):
         self.schedule = RandomActivation(self)
         self.datacollector = DataCollector(
             model_reporters={"L_best": get_best_length
-                             # ,"best_agent": get_best_agents
-                            }, # add best path and best agent?
+                             , "best_path": get_best_path
+#                              , "global_L_best": get_global_best_length
+                            },
             agent_reporters={"Length": "total_distance"}
         )
         
@@ -85,7 +109,7 @@ class TSPModel(Model):
         self.running = True
         
         # TODO comment
-        # self.datacollector.collect(self)
+#         self.datacollector.collect(self)
 
     def pheromone_update(self, tao, L_best):
         """Updates the pheromones in the graph each step"""
@@ -120,6 +144,7 @@ class TSPModel(Model):
             # restart attributes
             a.visited_nodes = []
             a.total_distance = 0
+            
             # select initial random grid for next iteration
             random_node_id = self.random.randint(1, self.max_nodes)
             self.grid.place_agent(a, random_node_id)
@@ -131,7 +156,7 @@ class TSPModel(Model):
         # TODO 1 complete cycle
         for i in range(self.max_nodes):
             self.schedule.step()
-        
+            
         # collect data
         self.datacollector.collect(self)
         
@@ -205,7 +230,7 @@ class TSPAgent(Agent):
         # Chooses unvisited node stochastically
         all_nodes = range(1, self.model.max_nodes + 1)
         if all(p == 0 for p in probabilities):
-            next_node_id = all_nodes[0]
+            next_node_id = self.visited_nodes[0]
         else:
             next_node_id = self.model.random.choices(all_nodes, weights=probabilities, k=1)[0]
         
@@ -220,3 +245,4 @@ class TSPAgent(Agent):
     def step(self):
         probabilities = self.calculate_probabilities()
         self.visit_node(probabilities)
+        
