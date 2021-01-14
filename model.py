@@ -6,12 +6,10 @@ import itertools
 from mesa import Agent, Model
 from mesa.time import RandomActivation
 from mesa.space import NetworkGrid
-# TODO add network visualization
-# from mesa.visualization.modules import NetworkVisualization
 from mesa.datacollection import DataCollector
 
 
-
+############################################################################
 def pairwise(iterable):
     "s -> (s0,s1), (s1,s2), (s2, s3), ..."
     a, b = itertools.tee(iterable)
@@ -35,7 +33,7 @@ def get_best_agents(model):
     
     best_agents = pd.DataFrame(list_agents, columns = ['unique_id', 'visited_nodes', 'total_distance'])
     return best_agents
-
+############################################################################
 
 
 
@@ -86,7 +84,7 @@ class TSPModel(Model):
         self.running = True
         
         # TODO comment
-        self.datacollector.collect(self)
+        # self.datacollector.collect(self)
 
     def pheromone_update(self, tao, L_best):
         """Updates the pheromones in the graph each step"""
@@ -118,9 +116,14 @@ class TSPModel(Model):
     
     def reset_agents(self):
         for a in self.schedule.agents:
+            # restart attributes
             a.visited_nodes = []
             a.total_distance = 0
-    
+            # select initial random grid for next iteration
+            random_node_id = self.random.randint(1, self.max_nodes)
+            self.grid.place_agent(a, random_node_id)
+            a.visited_nodes.append(random_node_id)
+            
     def step(self):
         # Each step is a complete solution
         
@@ -158,7 +161,7 @@ class TSPModel(Model):
         """Runs the model for n iterations"""
         for i in range(n):
             self.step()
-            
+############################################################################            
             
             
             
