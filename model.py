@@ -25,15 +25,6 @@ def get_best_length(model):
     L_best = min(agent_lengths)
     return L_best
 
-# def get_global_best_length(model):
-#     L_best_values = model.datacollector.get_model_vars_dataframe()#['L_best']
-#     print(L_best_values, type(L_best_values))
-#     if not L_best_values.empty:
-#         global_best_length = min(L_best_values)
-#     else:
-#         global_best_length = 100000
-#     return global_best_length
-
 def get_best_path(model):
     L_best = get_best_length(model)
     agents = model.schedule.agents
@@ -59,7 +50,8 @@ def get_best_agents(model):
 #################################### MODEL ########################################
 class TSPModel(Model):
     def __init__(self, a=1, b=2, ro=0.02, m=1, tao_init=1, tao_max=2, tao_min=0, 
-                 tsp_data_file = 'data/wi29.tsp'
+                 tsp_data_file = 'data/wi29.tsp',
+                 is_global_best = False
                 ):
         # Model parameters
         self.history_coefficient = a
@@ -72,7 +64,7 @@ class TSPModel(Model):
         # global best solutions
         self.global_best_L = math.inf
         self.global_best_path = []
-        
+        self.is_global_best = is_global_best
         # Reads the tsp_data_file
         problem = tsplib95.load(tsp_data_file)
         
@@ -90,7 +82,6 @@ class TSPModel(Model):
         self.datacollector = DataCollector(
             model_reporters={"L_best": get_best_length
                              , "best_path": get_best_path
-#                              , "global_L_best": get_global_best_length
                             },
             agent_reporters={"Length": "total_distance"}
         )
@@ -107,9 +98,6 @@ class TSPModel(Model):
         
         # batch parameter
         self.running = True
-        
-        # TODO comment
-#         self.datacollector.collect(self)
 
     def pheromone_update(self, tao, L_best):
         """Updates the pheromones in the graph each step"""
@@ -160,14 +148,15 @@ class TSPModel(Model):
         # collect data
         self.datacollector.collect(self)
         
-        # obtain L_best from this iteration
-        # L_best = self.datacollector.get_model_vars_dataframe().tail(1)['L_best'].iloc[0]        
-        # best_agent = self.datacollector.get_model_vars_dataframe().tail(1)['best_agent'].iloc[0]
-        
         # We obtain agents with the lowest total_distance from this iteration
         best_agents = get_best_agents(self)
         
-        # We iterate for each best ant its pheromone update
+        # TODO COMMENT IF NOT USED
+        # We obtain best global values
+        if self.is_global_best:
+            best_agents = pd.DataFrame([[self.global_best_path, self.global_best_L]], columns= ['visited_nodes', 'total_distance'])
+        
+        # We iterate for each best ant in this iteration its pheromone update
         for index, row in best_agents.iterrows():
             L_best = row['total_distance']
             best_tour = row['visited_nodes']

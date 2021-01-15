@@ -56,7 +56,7 @@ class MyTextElement(TextElement):
     def render(self, model):
         global_best_length = model.global_best_L
         global_best_path = model.global_best_path
-        return "Global Best Length: {}<br>Global best path: {}".format(
+        return "<b>Global Best Length</b>: {}<br><b>Global best path</b>: {}<br><br><b>Objective Length</b>: 27603".format(
             global_best_length, global_best_path
         )
 
