@@ -8,9 +8,10 @@ from mesa import Agent, Model
 from mesa.time import RandomActivation
 from mesa.space import NetworkGrid
 from mesa.datacollection import DataCollector
-
+from mesa.batchrunner import BatchRunner
 
 ################################# GENERAL FUNCTIONS ###########################################
+
 def pairwise(iterable):
     "s -> (s0,s1), (s1,s2), (s2, s3), ..."
     a, b = itertools.tee(iterable)
@@ -26,6 +27,7 @@ def get_best_length(model):
     return L_best
 
 def get_best_path(model):
+    """Picks the shortest path from the model (in this iteration)"""
     L_best = get_best_length(model)
     agents = model.schedule.agents
     list_visited_nodes = [a.visited_nodes for a in agents if a.total_distance == L_best]
@@ -37,7 +39,8 @@ def get_best_agents(model):
     
     agents = model.schedule.agents
     list_agents = [[a.unique_id, a.visited_nodes, a.total_distance] for a in agents if a.total_distance == L_best]
-    # we update the best solution
+    
+    # we update the global best solution
     if L_best < model.global_best_L:
         model.global_best_L = L_best
         model.global_best_path = list_agents[0][1] # we choose the first solution
@@ -53,7 +56,7 @@ class TSPModel(Model):
                  tsp_data_file = 'data/wi29.tsp',
                  is_global_best = False
                 ):
-        # Model parameters
+        # Algorithm parameters
         self.history_coefficient = a
         self.heuristic_coefficient = b
         self.evaporation_rate = ro
@@ -80,8 +83,8 @@ class TSPModel(Model):
         
         self.schedule = RandomActivation(self)
         self.datacollector = DataCollector(
-            model_reporters={"L_best": get_best_length
-                             , "best_path": get_best_path
+            model_reporters={"L_best": get_best_length, 
+                             "best_path": get_best_path
                             },
             agent_reporters={"Length": "total_distance"}
         )
@@ -128,6 +131,7 @@ class TSPModel(Model):
         return pheromone
     
     def reset_agents(self):
+        """Reinitializes the agents for the next model step"""
         for a in self.schedule.agents:
             # restart attributes
             a.visited_nodes = []
@@ -140,8 +144,6 @@ class TSPModel(Model):
             
     def step(self):
         # Each step is a complete solution
-        
-        # TODO 1 complete cycle
         for i in range(self.max_nodes):
             self.schedule.step()
             
@@ -151,8 +153,7 @@ class TSPModel(Model):
         # We obtain agents with the lowest total_distance from this iteration
         best_agents = get_best_agents(self)
         
-        # TODO COMMENT IF NOT USED
-        # We obtain best global values
+        # In case of best-so-far length policy
         if self.is_global_best:
             best_agents = pd.DataFrame([[self.global_best_path, self.global_best_L]], columns= ['visited_nodes', 'total_distance'])
         
@@ -173,7 +174,7 @@ class TSPModel(Model):
         
         
     def run_model(self, n):
-        """Runs the model for n iterations"""
+        """Runs the model for n iterations (steps)"""
         for i in range(n):
             self.step()
 ############################################################################            
@@ -188,7 +189,7 @@ class TSPAgent(Agent):
         self.total_distance = 0 # total travel distance
 
     def calculate_probabilities(self):
-        # Calculates probabilities with formula
+        """Calculates probabilities with stochastic formula"""
         
         # Obtains feasible nodes
         current_node = self.visited_nodes[-1]
@@ -216,7 +217,7 @@ class TSPAgent(Agent):
         return probabilities
     
     def visit_node(self, probabilities):
-        # Chooses unvisited node stochastically
+        """Chooses unvisited node stochastically"""
         all_nodes = range(1, self.model.max_nodes + 1)
         if all(p == 0 for p in probabilities):
             next_node_id = self.visited_nodes[0]
@@ -232,6 +233,7 @@ class TSPAgent(Agent):
         self.model.grid.move_agent(self, next_node_id)
         
     def step(self):
+        """Agent chooses and visits the next node stochastically"""
         probabilities = self.calculate_probabilities()
         self.visit_node(probabilities)
         
